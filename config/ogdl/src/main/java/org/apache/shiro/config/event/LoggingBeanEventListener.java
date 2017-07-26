@@ -36,7 +36,7 @@ public class LoggingBeanEventListener {
     public void onEvent(BeanEvent e) {
         String className = e.getClass().getSimpleName();
         int i = className.lastIndexOf(SUFFIX);
-        String subclassPrefix = className.substring(0, i);
+        String subclassPrefix = i > 0 ? className.substring(0, i) : className;
         logger.trace("{} bean '{}' [{}]", new Object[]{subclassPrefix, e.getBeanName(), e.getBean()});
     }
 }

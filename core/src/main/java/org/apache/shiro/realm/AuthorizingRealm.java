@@ -244,8 +244,8 @@ public abstract class AuthorizingRealm extends AuthenticatingRealm
                 }
                 this.authorizationCache = cacheManager.getCache(cacheName);
             } else {
-                if (log.isInfoEnabled()) {
-                    log.info("No cache or cacheManager properties have been set.  Authorization cache cannot " +
+                if (log.isDebugEnabled()) {
+                    log.debug("No cache or cacheManager properties have been set.  Authorization cache cannot " +
                             "be obtained.");
                 }
             }
@@ -431,7 +431,7 @@ public abstract class AuthorizingRealm extends AuthenticatingRealm
         if (resolver != null && !CollectionUtils.isEmpty(stringPerms)) {
             perms = new LinkedHashSet<Permission>(stringPerms.size());
             for (String strPermission : stringPerms) {
-                Permission permission = getPermissionResolver().resolvePermission(strPermission);
+                Permission permission = resolver.resolvePermission(strPermission);
                 perms.add(permission);
             }
         }

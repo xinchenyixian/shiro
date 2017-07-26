@@ -28,7 +28,9 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 
 
 /**
@@ -176,6 +178,59 @@ public class BasicHttpAuthenticationFilter extends AuthenticatingFilter {
     public void setAuthcScheme(String authcScheme) {
         this.authcScheme = authcScheme;
     }
+    
+    /**
+     * The Basic authentication filter can be configured with a list of HTTP methods to which it should apply. This
+     * method ensures that authentication is <em>only</em> required for those HTTP methods specified. For example,
+     * if you had the configuration:
+     * <pre>
+     *    [urls]
+     *    /basic/** = authcBasic[POST,PUT,DELETE]
+     * </pre>
+     * then a GET request would not required authentication but a POST would.
+     * @param request The current HTTP servlet request.
+     * @param response The current HTTP servlet response.
+     * @param mappedValue The array of configured HTTP methods as strings. This is empty if no methods are configured.
+     */
+    protected boolean isAccessAllowed(ServletRequest request, ServletResponse response, Object mappedValue) {
+        HttpServletRequest httpRequest = WebUtils.toHttp(request);
+        String httpMethod = httpRequest.getMethod();
+        
+        // Check whether the current request's method requires authentication.
+        // If no methods have been configured, then all of them require auth,
+        // otherwise only the declared ones need authentication.
+
+        Set<String> methods = httpMethodsFromOptions((String[])mappedValue);
+        boolean authcRequired = methods.size() == 0;
+        for (String m : methods) {
+            if (httpMethod.toUpperCase(Locale.ENGLISH).equals(m)) { // list of methods is in upper case
+                authcRequired = true;
+                break;
+            }
+        }
+        
+        if (authcRequired) {
+            return super.isAccessAllowed(request, response, mappedValue);
+        }
+        else {
+            return true;
+        }
+    }
+
+    private Set<String> httpMethodsFromOptions(String[] options) {
+        Set<String> methods = new HashSet<String>();
+
+        if (options != null) {
+            for (String option : options) {
+                // to be backwards compatible with 1.3, we can ONLY check for known args
+                // ideally we would just validate HTTP methods, but someone could already be using this for webdav
+                if (!option.equalsIgnoreCase(PERMISSIVE)) {
+                    methods.add(option.toUpperCase(Locale.ENGLISH));
+                }
+            }
+        }
+        return methods;
+    }
 
     /**
      * Processes unauthenticated requests. It handles the two-stage request/challenge authentication protocol.
@@ -270,9 +325,8 @@ public class BasicHttpAuthenticationFilter extends AuthenticatingFilter {
      * @return false - this sends the challenge to be sent back
      */
     protected boolean sendChallenge(ServletRequest request, ServletResponse response) {
-        if (log.isDebugEnabled()) {
-            log.debug("Authentication required: sending 401 Authentication challenge response.");
-        }
+        log.debug("Authentication required: sending 401 Authentication challenge response.");
+
         HttpServletResponse httpResponse = WebUtils.toHttp(response);
         httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         String authcHeader = getAuthcScheme() + " realm=\"" + getApplicationName() + "\"";
@@ -304,9 +358,7 @@ public class BasicHttpAuthenticationFilter extends AuthenticatingFilter {
             return createToken("", "", request, response);
         }
 
-        if (log.isDebugEnabled()) {
-            log.debug("Attempting to execute login with headers [" + authorizationHeader + "]");
-        }
+        log.debug("Attempting to execute login with auth header");
 
         String[] prinCred = getPrincipalsAndCredentials(authorizationHeader, request);
         if (prinCred == null || prinCred.length < 2) {
